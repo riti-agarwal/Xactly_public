@@ -3,6 +3,7 @@ import { Box, Typography, styled } from '@mui/material';
 import ProductGrid from './components/ProductGrid';
 import ChatBar from './components/ChatBar';
 import ProductCollections from './components/ProductCollections';
+import { SidebarProvider } from './context/SidebarContext';
 
 const MainContainer = styled(Box)({
   display: 'flex',
@@ -51,24 +52,26 @@ const ContentContainer = styled(Box)({
 
 function App() {
   return (
-    <MainContainer>
-      <NavBar>
-        <Typography variant="h6" sx={{ fontWeight: 600, color: 'white', letterSpacing: '0.5px' }}>
-          Xactly
-        </Typography>
-      </NavBar>
-      <ContentContainer>
-        <ProductSection>
-          <ProductContent>
-            <ProductGrid />
-          </ProductContent>
-          <ProductCollections />
-        </ProductSection>
-        <ChatSection>
-          <ChatBar />
-        </ChatSection>
-      </ContentContainer>
-    </MainContainer>
+    <SidebarProvider>
+      <MainContainer>
+        <NavBar>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: 'white', letterSpacing: '0.5px' }}>
+            Xactly
+          </Typography>
+        </NavBar>
+        <ContentContainer>
+          <ProductSection>
+            <ProductContent>
+              <ProductGrid />
+            </ProductContent>
+            <ProductCollections />
+          </ProductSection>
+          <ChatSection>
+            <ChatBar />
+          </ChatSection>
+        </ContentContainer>
+      </MainContainer>
+    </SidebarProvider>
   );
 }
 

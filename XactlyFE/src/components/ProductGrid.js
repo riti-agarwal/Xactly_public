@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Box, styled, Typography, Tooltip } from '@mui/material';
+import { Box, styled, Typography, Tooltip, CircularProgress } from '@mui/material';
 import Masonry from 'react-masonry-css';
+import { fetchRandomImages } from '../services/apis';
+import { useSidebar } from '../context/SidebarContext';
 
-const MasonryContainer = styled(Box)({
+const MasonryContainer = styled(Box)(props => ({
   width: '100%',
+  transition: 'padding-left 0.3s ease-in-out',
+  paddingLeft: props.sidebarVisible ? '300px' : '0',
   '.my-masonry-grid': {
     display: 'flex',
     marginLeft: '-16px', /* gutter size offset */
@@ -13,7 +17,7 @@ const MasonryContainer = styled(Box)({
     paddingLeft: '16px', /* gutter size */
     backgroundClip: 'padding-box',
   },
-});
+}));
 
 const ProductCard = styled(Box)({
   backgroundColor: '#2d2d2d',
@@ -76,6 +80,9 @@ const MetricFill = styled(Box)({
 const ProductGrid = () => {
   const [products, setProducts] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { isSidebarVisible } = useSidebar();
   
   // Responsive breakpoints for the masonry layout
   const breakpointColumnsObj = {
@@ -86,95 +93,31 @@ const ProductGrid = () => {
   };
 
   useEffect(() => {
-    // Generate random metrics for each product
-    const generateRandomMetrics = () => {
-      return {
-        quality: Math.floor(Math.random() * 51) + 50, // Random value between 50-100
-        history_quality: Math.floor(Math.random() * 51) + 50,
-        trend_quality: Math.floor(Math.random() * 51) + 50
-      };
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchRandomImages();
+        
+        // Map the API response to our product format
+        const formattedProducts = data.images.map(item => ({
+          imageUrl: item.url,
+          quality: item.quality,
+          history_quality: item.history_quality,
+          trend_quality: item.trend_quality
+        }));
+        
+        setProducts(formattedProducts);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load products:', err);
+        setError('Failed to load products. Please try again later.');
+      } finally {
+        setLoading(false);
+        setLoaded(true);
+      }
     };
 
-    // Using a mix of portrait and landscape images with randomized quality metrics
-    const shoeImages = [
-      { 
-        id: 1, 
-        imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 2, 
-        imageUrl: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=800&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 3, 
-        imageUrl: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?q=80&w=700&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 4, 
-        imageUrl: 'https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?q=80&w=500&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 5, 
-        imageUrl: 'https://images.unsplash.com/photo-1551107696-a4b0c5a0d9a2?q=80&w=600&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 6, 
-        imageUrl: 'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?q=80&w=900&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 7, 
-        imageUrl: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?q=80&w=400&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 8, 
-        imageUrl: 'https://images.unsplash.com/photo-1605348532760-6753d2c43329?q=80&w=700&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 9, 
-        imageUrl: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?q=80&w=500&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 10, 
-        imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=600&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 11, 
-        imageUrl: 'https://images.unsplash.com/photo-1543508282-6319a3e2621f?q=80&w=800&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 12, 
-        imageUrl: 'https://images.unsplash.com/photo-1600269452121-4f2416e55c28?q=80&w=550&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 13, 
-        imageUrl: 'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?q=80&w=600&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 14, 
-        imageUrl: 'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?q=80&w=750&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-      { 
-        id: 15, 
-        imageUrl: 'https://images.unsplash.com/photo-1518002171953-a080ee817e1f?q=80&w=450&auto=format&fit=crop',
-        ...generateRandomMetrics()
-      },
-    ];
-    setProducts(shoeImages);
-    setLoaded(true);
+    loadProducts();
   }, []);
 
   const handleImageLoad = (e) => {
@@ -182,7 +125,19 @@ const ProductGrid = () => {
   };
 
   return (
-    <MasonryContainer>
+    <MasonryContainer sidebarVisible={isSidebarVisible}>
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', padding: '40px' }}>
+          <CircularProgress sx={{ color: '#fff' }} />
+        </Box>
+      )}
+      
+      {error && (
+        <Box sx={{ color: '#ff5252', textAlign: 'center', width: '100%', padding: '20px' }}>
+          <Typography variant="body1">{error}</Typography>
+        </Box>
+      )}
+      
       <Masonry
         breakpointCols={breakpointColumnsObj}
         className="my-masonry-grid"
@@ -192,7 +147,7 @@ const ProductGrid = () => {
           <ProductCard key={product.id}>
             <Box>
               <ProductImage 
-                src={product.imageUrl}
+                src={`data:image/jpeg;base64,${product.imageUrl}`}
                 alt={`Product ${product.id}`}
                 onLoad={handleImageLoad}
                 style={{ opacity: 0, transition: 'opacity 0.3s' }}

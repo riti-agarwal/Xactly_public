@@ -4,6 +4,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import CloseIcon from '@mui/icons-material/Close';
+import { useSidebar } from '../context/SidebarContext';
 
 const CollectionsContainer = styled(Box)({
   backgroundColor: '#2d2d2d',
@@ -120,7 +121,7 @@ const DropZone = styled(Box)({
 const ProductCollections = () => {
   // Reference to the container for click outside detection
   const containerRef = useRef(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const { isSidebarVisible, toggleSidebar } = useSidebar();
   const [historicImages, setHistoricImages] = useState([]);
   const [trendImages, setTrendImages] = useState([]);
   const [isDraggingOverHistoric, setIsDraggingOverHistoric] = useState(false);
@@ -171,9 +172,9 @@ const ProductCollections = () => {
     }
   };
 
-  // Toggle visibility of the entire collections container
-  const toggleVisibility = () => {
-    setIsVisible(!isVisible);
+  // Toggle visibility of the entire collections container using the context
+  const handleToggleVisibility = () => {
+    toggleSidebar();
   };
 
   // We've removed the click-outside behavior to allow for easier drag and drop operations
@@ -184,7 +185,7 @@ const ProductCollections = () => {
         data-collections-toggle="true"
         sx={{
           position: 'absolute',
-          left: isVisible ? '300px' : '0',
+          left: isSidebarVisible ? '300px' : '0',
           top: '50%',
           transform: 'translateY(-50%)',
           backgroundColor: '#1a1a1a',
@@ -199,13 +200,13 @@ const ProductCollections = () => {
           width: '32px',
           height: '64px',
         }} 
-        onClick={toggleVisibility}
+        onClick={handleToggleVisibility}
       >
         <IconButton size="small" sx={{ color: 'white', padding: 0 }}>
-          {isVisible ? <ChevronLeftIcon /> : <ExpandMoreIcon sx={{ transform: 'rotate(-90deg)' }} />}
+          {isSidebarVisible ? <ChevronLeftIcon /> : <ExpandMoreIcon sx={{ transform: 'rotate(-90deg)' }} />}
         </IconButton>
       </Box>
-      <CollectionsContainer ref={containerRef} className={isVisible ? 'visible' : ''}>        
+      <CollectionsContainer ref={containerRef} className={isSidebarVisible ? 'visible' : ''}>        
         <SectionContainer
           sx={{ position: 'relative' }}
           onDragOver={handleHistoricDragOver}
@@ -228,7 +229,10 @@ const ProductCollections = () => {
             {historicImages.length > 0 ? (
               historicImages.map((img, index) => (
                 <ImageContainer key={index}>
-                  <CollectionImage src={img} alt={`Historic item ${index}`} />
+                  <CollectionImage 
+                    src={img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`} 
+                    alt={`Historic item ${index}`} 
+                  />
                   <RemoveButton 
                     className="remove-button"
                     size="small" 
@@ -277,7 +281,10 @@ const ProductCollections = () => {
             {trendImages.length > 0 ? (
               trendImages.map((img, index) => (
                 <ImageContainer key={index}>
-                  <CollectionImage src={img} alt={`Trend item ${index}`} />
+                  <CollectionImage 
+                    src={img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`} 
+                    alt={`Trend item ${index}`} 
+                  />
                   <RemoveButton 
                     className="remove-button"
                     size="small" 

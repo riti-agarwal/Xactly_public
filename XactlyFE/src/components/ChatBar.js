@@ -188,7 +188,10 @@ const ChatBar = () => {
           >
             {message.image && (
               <MessageImageContainer>
-                <MessageImage src={message.image} alt="Shared context" />
+                <MessageImage 
+                  src={message.image.startsWith('data:') ? message.image : `data:image/jpeg;base64,${message.image}`} 
+                  alt="Shared context" 
+                />
               </MessageImageContainer>
             )}
             {message.text}
@@ -199,7 +202,10 @@ const ChatBar = () => {
       
       {contextImage && (
         <ContextPreview>
-          <ContextImage src={contextImage} alt="Context" />
+          <ContextImage 
+            src={contextImage.startsWith('data:') ? contextImage : `data:image/jpeg;base64,${contextImage}`} 
+            alt="Context" 
+          />
           <Typography variant="body2" sx={{ color: '#ccc', flexGrow: 1 }}>
             Image added as context
           </Typography>
