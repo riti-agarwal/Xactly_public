@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+_pycache_/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook files
+*.ipynb
+.vercel
+
+# Small Folder
+small
+
+# Adding this specific dataframe for usage - please delete all outputs before pushing. Else it will break everything
+!imageDataframe.ipynb
+!riti_image_embeddings.ipynb
+!riti_clip_pinecone.ipynb
