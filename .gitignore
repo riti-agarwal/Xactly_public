@@ -1,5 +1,7 @@
 # Byte-compiled / optimized / DLL files
-_pycache_/
+*.pyc
+*.pyo
+__pycache__/
 
 # Environments
 .env
@@ -16,6 +18,8 @@ venv.bak/
 
 # Small Folder
 small
+
+
 
 # Adding this specific dataframe for usage - please delete all outputs before pushing. Else it will break everything
 !imageDataframe.ipynb
