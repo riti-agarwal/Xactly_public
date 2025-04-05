@@ -6,6 +6,11 @@ import os
 from dotenv import load_dotenv
 import openai
 
+# Blip model imports
+from transformers import BlipProcessor, BlipForImageTextRetrieval
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from PIL import Image
+
 # TODO: Be able to pass 100 best from krish method to blip, and then narrow it down using blip
 # Extra TODO: switch krish method with llama 4 or somethign
 # TODO: Bring in user preferneces and current fashion trends
@@ -96,49 +101,106 @@ response = client.responses.create(
 
 # Step 5: Embed GPT response using HuggingFace CLIP
 textQuery = response.output_text.strip()
+print(f"GPT reprhase: {textQuery}")
 queryEmbedding = embed_with_clip(text=textQuery)
 
-# --------- Query 1: Text Embedding Index ---------
 index = pc.Index("clip-shoe-index")
 
-results_text = index.query(
+
+# Retrieve top 100 image names from clip-text and clip-image results
+results_text_top_100 = index.query(
     vector=queryEmbedding.tolist(),
-    top_k=5,
+    top_k=10,
     namespace="clip-text",
     include_metadata=True
 )
 
-# Display text-based results
-print(f"\nText-based query: {textQuery}")
-fig, axes = plt.subplots(1, len(results_text['matches']), figsize=(15, 3))
-for idx, match in enumerate(results_text['matches']):
-    matchingImage = shoeImages[shoeImages['image_id'] == match['metadata']['imageId']]
-    if not matchingImage.empty:
-        img = plt.imread(matchingImage['fullImagePath'].iloc[0])
-        axes[idx].imshow(img)
-        axes[idx].set_title(f"Score: {match['score']:.3f}")
-        axes[idx].axis('off')
-plt.tight_layout()
-plt.show()
-
-# --------- Query 2: Image Embedding Index ---------
-results_image = index.query(
+results_image_top_100 = index.query(
     vector=queryEmbedding.tolist(),
-    top_k=5,
+    top_k=10,
     namespace="clip-image",
     include_metadata=True
 )
 
-# Display image-based results
-print(f"\nImage-based query: {textQuery}")
-fig, axes = plt.subplots(1, len(results_image['matches']), figsize=(15, 3))
-for idx, match in enumerate(results_image['matches']):
-    matchingImage = shoeImages[shoeImages['image_id'] == match['metadata']['imageId']]
-    if not matchingImage.empty:
-        img = plt.imread(matchingImage['fullImagePath'].iloc[0])
-        axes[idx].imshow(img)
-        axes[idx].set_title(f"Score: {match['score']:.3f}")
-        axes[idx].axis('off')
+# Extract image names
+text_image_names = {match['metadata']['imageId'] for match in results_text_top_100['matches']}
+image_image_names = {match['metadata']['imageId'] for match in results_image_top_100['matches']}
+
+# Combine and remove duplicates
+unique_image_names = text_image_names.union(image_image_names)
+
+# Map unique image IDs to their full image paths
+unique_image_paths = {}
+for image_id in unique_image_names:
+    matching_image = shoeImages[shoeImages['image_id'] == image_id]
+    if not matching_image.empty:
+        unique_image_paths[image_id] = matching_image['fullImagePath'].iloc[0]
+
+# Display the full image paths
+for image_id, path in unique_image_paths.items():
+    print(f"Image ID: {image_id}, Path: {path}")
+
+# Pass full image paths to the blip model - have it choose the best 7. 
+
+blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-itm-base-coco", use_fast=True)
+blip_model = BlipForImageTextRetrieval.from_pretrained("Salesforce/blip-itm-base-coco")
+blip_model.eval()
+
+# --- Generate caption from the reference image ---
+def generate_caption(image_path):
+    caption_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+    caption_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+    caption_model.eval()
+
+    image = Image.open(image_path).convert("RGB")
+    inputs = caption_processor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        out = caption_model.generate(**inputs)
+    return caption_processor.decode(out[0], skip_special_tokens=True)
+
+def get_blip_similarity_score(image_path, text_query):
+    image = Image.open(image_path).convert('RGB')
+    inputs = blip_processor(images=image, text=text_query, return_tensors="pt")
+    with torch.no_grad():
+        outputs = blip_model(**inputs)
+    scores = outputs.itm_score
+    if scores.ndim == 2 and scores.shape == (1, 2):
+        return scores[0, 0].item()
+    elif scores.ndim == 1:
+        return scores[0].item()
+    elif scores.ndim == 0:
+        return scores.item()
+    else:
+        raise ValueError(f"Unexpected itm_score shape: {scores.shape}")
+    
+
+# Construct blip query
+image_caption = generate_caption(imagePath)
+full_query = f"{query}. {image_caption.strip()}"
+print(f"blip query is: {full_query}")
+
+# --- Score each image with BLIP ---
+blip_scores = []
+for image_id, path in unique_image_paths.items():
+    try:
+        score = get_blip_similarity_score(path, full_query)
+        blip_scores.append((score, image_id, path))
+    except Exception as e:
+        print(f"Error with image {image_id}: {e}")
+
+# --- Sort by BLIP score and select top 20 ---
+blip_scores = sorted(blip_scores, key=lambda x: x[0], reverse=True)[:10]
+
+# --- Display top 20 matching shoes ---
+fig, axes = plt.subplots(1, len(blip_scores), figsize=(4 * len(blip_scores), 5))
+if len(blip_scores) == 1:
+    axes = [axes]
+
+for idx, (score, image_id, path) in enumerate(blip_scores):
+    img = Image.open(path)
+    axes[idx].imshow(img)
+    axes[idx].set_title(f"Score: {score:.2f}")
+    axes[idx].axis('off')
+
 plt.tight_layout()
 plt.show()
-

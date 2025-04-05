@@ -2,6 +2,8 @@ from flask import Flask
 from config import config
 from app.blueprints.auth import auth_bp
 from app.blueprints.index import index_bp
+from app.blueprints.thread import thread_bp
+
 import mongoengine
 from flask_cors import CORS
 
@@ -35,5 +37,7 @@ def createApp(configName='default'):
     
     app.register_blueprint(index_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(thread_bp)
+
 
     return app
