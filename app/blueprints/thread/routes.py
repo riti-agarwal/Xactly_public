@@ -66,7 +66,6 @@ def create_thread():
 
 # @thread_bp.route('/sendMessage', methods=['POST'])
 # def send_message():
-#     # TODO: Make this work with if the last message does not have an image - what do we do. 
 #     data = request.json
 #     thread_id = data.get("threadId")
 #     messages = data.get("messages", [])
@@ -236,6 +235,8 @@ def send_message():
 
         gpt_messages = [system_instruction]
         for msg in full_thread:
+            # TODO: Map image path to image ID, and then pass it as part of the content history
+            # TODO: loop through everything expecpt the last message in full_thread
             if msg["role"] == "USER":
                 gpt_messages.append({"role": "user", "content": msg["text"]})
             elif msg["role"] == "ASSISTANT":
@@ -246,7 +247,7 @@ def send_message():
             "content": [
                 {
                     "type": "text",
-                    "text": f"This is the user’s latest query and a reference image: {user_query}..."
+                    "text": f"This is the user’s latest query and a reference image: {user_query}. Use the image to guide your answer. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
                 },
                 {
                     "type": "image_url",
