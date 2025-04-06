@@ -110,71 +110,127 @@ def send_message():
     image_path = get_full_path(image_id)
     print(f"image_path is {image_path}")
 
-    if image_path:
-        base64_image = encode_image(image_path)
+    # if image_path:
+    #     base64_image = encode_image(image_path)
 
-        # --- GPT-4o rephrasing ---
-        system_instruction = {
-            "role": "system",
-            "content": f"This is the user’s latest query and a reference image: {user_query}. Use the image to guide your answer. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
-        }
+    #     # --- GPT-4o rephrasing ---
+    #     system_instruction = {
+    #         "role": "system",
+    #         "content": f"This is the user’s latest query and a reference image: {user_query}. Use the image to guide your answer. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
+    #     }
 
-        gpt_messages = [system_instruction]
+    #     gpt_messages = [system_instruction]
 
-        for msg in full_thread[:-1]:
-            role = msg["role"].lower()
-            if role == "assistant":
-                gpt_messages.append({ "role": "assistant", "content": msg["text"] })
-            elif role == "user":
-                image_id = msg.get("imageId")
-                if image_id:
-                    full_path = get_full_path(image_id)
-                    if full_path:
-                        try:
-                            image_b64 = encode_image(full_path)
-                            gpt_messages.append({
-                                "role": "user",
-                                "content": [
-                                    { "type": "text", "text": msg["text"] },
-                                    { "type": "image_url", "image_url": { "url": f"data:image/jpeg;base64,{image_b64}" } }
-                                ]
-                            })
-                        except Exception as e:
-                            print(f"Could not load image {image_id} → {full_path}: {e}")
-                            gpt_messages.append({ "role": "user", "content": msg["text"] })
-                    else:
-                        print(f"Image ID {image_id} not found in shoe_images.")
-                        gpt_messages.append({ "role": "user", "content": msg["text"] })
-                else:
-                    gpt_messages.append({ "role": "user", "content": msg["text"] })
+    #     for msg in full_thread[:-1]:
+    #         role = msg["role"].lower()
+    #         if role == "assistant":
+    #             gpt_messages.append({ "role": "assistant", "content": msg["text"] })
+    #         elif role == "user":
+    #             image_id = msg.get("imageId")
+    #             if image_id:
+    #                 full_path = get_full_path(image_id)
+    #                 if full_path:
+    #                     try:
+    #                         image_b64 = encode_image(full_path)
+    #                         gpt_messages.append({
+    #                             "role": "user",
+    #                             "content": [
+    #                                 { "type": "text", "text": msg["text"] },
+    #                                 { "type": "image_url", "image_url": { "url": f"data:image/jpeg;base64,{image_b64}" } }
+    #                             ]
+    #                         })
+    #                     except Exception as e:
+    #                         print(f"Could not load image {image_id} → {full_path}: {e}")
+    #                         gpt_messages.append({ "role": "user", "content": msg["text"] })
+    #                 else:
+    #                     print(f"Image ID {image_id} not found in shoe_images.")
+    #                     gpt_messages.append({ "role": "user", "content": msg["text"] })
+    #             else:
+    #                 gpt_messages.append({ "role": "user", "content": msg["text"] })
         
+    #     gpt_messages.append({
+    #         "role": "user",
+    #         "content": [
+    #             {
+    #                 "type": "text",
+    #                 "text": f"This is the user’s latest query and a reference image: {user_query}. Use the image to guide your answer. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
+    #             },
+    #             {
+    #                 "type": "image_url",
+    #                 "image_url": {
+    #                     "url": f"data:image/jpeg;base64,{base64_image}"
+    #                 }
+    #             }
+    #         ]
+    #     })
+
+    #     response = client.chat.completions.create(
+    #         model="gpt-4o",
+    #         messages=gpt_messages,
+    #         temperature=0.3,
+    #         max_tokens=50,
+    #     )
+    #     text_query = response.choices[0].message.content.strip()
+    # else:
+    #     # No image: use latest user query directly
+    #     text_query = user_query.strip()
+
+    base64_image = encode_image(image_path) if image_path else None
+
+    # --- GPT-4o rephrasing ---
+    system_instruction = {
+        "role": "system",
+        "content": "You are a helpful assistant that rewrites vague product queries into concise product descriptions. Use any image provided to infer semantic meaning, and always turn negatives into positives. Provide only a 10-word product description."
+    }
+
+    gpt_messages = [system_instruction]
+
+    for msg in full_thread[:-1]:
+        role = msg["role"].lower()
+        if role == "assistant":
+            gpt_messages.append({ "role": "assistant", "content": msg["text"] })
+        elif role == "user":
+            image_id = msg.get("imageId")
+            if image_id:
+                full_path = get_full_path(image_id)
+                if full_path:
+                    try:
+                        image_b64 = encode_image(full_path)
+                        gpt_messages.append({
+                            "role": "user",
+                            "content": [
+                                { "type": "text", "text": msg["text"] },
+                                { "type": "image_url", "image_url": { "url": f"data:image/jpeg;base64,{image_b64}" } }
+                            ]
+                        })
+                        continue
+                    except Exception as e:
+                        print(f"Could not load image {image_id} → {full_path}: {e}")
+            gpt_messages.append({ "role": "user", "content": msg["text"] })
+
+    # Append the latest user message
+    if image_path and base64_image:
         gpt_messages.append({
             "role": "user",
             "content": [
-                {
-                    "type": "text",
-                    "text": f"This is the user’s latest query and a reference image: {user_query}. Use the image to guide your answer. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
-                    }
-                }
+                { "type": "text", "text": user_query },
+                { "type": "image_url", "image_url": { "url": f"data:image/jpeg;base64,{base64_image}" } }
             ]
         })
-
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=gpt_messages,
-            temperature=0.3,
-            max_tokens=50,
-        )
-        text_query = response.choices[0].message.content.strip()
     else:
-        # No image: use latest user query directly
-        text_query = user_query.strip()
+        gpt_messages.append({
+            "role": "user",
+            "content": user_query
+        })
 
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=gpt_messages,
+        temperature=0.3,
+        max_tokens=50,
+    )
+    text_query = response.choices[0].message.content.strip()
+    
     # --- Embed query using CLIP ---
     clip_inputs = clip_tokenizer(text_query, return_tensors="pt", padding=True, truncation=True, max_length=77)
     with torch.no_grad():
