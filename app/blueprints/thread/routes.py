@@ -52,6 +52,23 @@ def image_to_base64(path):
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
+    
+def get_full_path(image_id):
+    image_id = str(image_id).strip()
+
+    # 1. Match exact in mainImageId
+    match = shoe_images[shoe_images["mainImageId"].astype(str).str.strip() == image_id]
+    if not match.empty:
+        return match["fullImagePath"].iloc[0]
+
+    # 2. Fallback: check if fullImagePath contains image_id as substring
+    match = shoe_images[shoe_images["fullImagePath"].str.contains(image_id, na=False)]
+    if not match.empty:
+        return match["fullImagePath"].iloc[0]
+
+    print(f"[WARN] Image ID '{image_id}' not found in mainImageId or fullImagePath")
+    return None
+
 
 # In-memory storage
 threads = defaultdict(list)
@@ -63,141 +80,6 @@ def create_thread():
     threads[thread_id] = []
     return jsonify({"threadId": thread_id})
 
-
-# @thread_bp.route('/sendMessage', methods=['POST'])
-# def send_message():
-#     data = request.json
-#     thread_id = data.get("threadId")
-#     messages = data.get("messages", [])
-
-#     if not thread_id or thread_id not in threads:
-#         return jsonify({"error": "Invalid or missing threadId"}), 400
-
-#     # Append new messages to thread history
-#     threads[thread_id].extend(messages)
-#     full_thread = threads[thread_id]
-
-#     # Get latest USER message with image
-#     latest_user_msg = None
-#     for msg in reversed(full_thread):
-#         if msg["role"] == "USER" and msg.get("imageId"):
-#             latest_user_msg = msg
-#             break
-
-#     if not latest_user_msg:
-#         return jsonify({"error": "No valid user message with image found"}), 400
-
-#     user_query = latest_user_msg["text"]
-#     image_path = latest_user_msg["imageId"]
-
-#     base64_image = encode_image(image_path)
-
-#     # --- GPT-4o Rephrasing using full history ---
-#     system_instruction = {
-#         "role": "system",
-#         "content": "You are a shopping assistant helping rephrase user queries. Use all previous conversation context but emphasize the latest user message and the image provided. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
-#     }
-
-#     gpt_messages = [system_instruction]
-
-#     # Add all previous messages (text-only)
-#     # TODO: Map image path to image ID, and then pass it as part of the content history
-#     # TODO: loop through everything expecpt the last message in full_thread
-#     for msg in full_thread:
-#         if msg["role"] == "USER":
-#             gpt_messages.append({
-#                 "role": "user",
-#                 "content": msg["text"]
-#             })
-#         elif msg["role"] == "ASSISTANT":
-#             gpt_messages.append({
-#                 "role": "assistant",
-#                 "content": msg["text"]
-#             })
-
-#     # Add the image + emphasized final query
-#     gpt_messages.append({
-#         "role": "user",
-#         "content": [
-#             {
-#                 "type": "text",
-#                 "text": f"This is the user’s latest query and a reference image: {user_query}. Use the image to guide your answer. I want you to create a description of a product given a users query and an image relating to the query. Make sure you extract the semantic meaning - negatives should be converted to positives. The query has no referance to the image so add all the image info into the query. State the description of what the user might be searching for. Provide no formatting, just a very short 10 word description of the target shoe."
-#             },
-#             {
-#                 "type": "image_url",
-#                 "image_url": {
-#                     "url": f"data:image/jpeg;base64,{base64_image}"
-#                 }
-#             }
-#         ]
-#     })
-
-#     response = client.chat.completions.create(
-#         model="gpt-4o",
-#         messages=gpt_messages,
-#         temperature=0.3,
-#         max_tokens=50,
-#     )
-
-#     text_query = response.choices[0].message.content.strip()
-
-#     # --- Embed query with CLIP ---
-#     clip_inputs = clip_tokenizer(text_query, return_tensors="pt", padding=True, truncation=True, max_length=77)
-#     with torch.no_grad():
-#         text_features = clip_model.get_text_features(**clip_inputs)
-#         text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)
-#     query_embedding = text_features.squeeze().cpu().numpy()
-
-#     # --- Pinecone search ---
-#     results_text = index.query(vector=query_embedding.tolist(), top_k=10, namespace="clip-text", include_metadata=True)
-#     results_image = index.query(vector=query_embedding.tolist(), top_k=10, namespace="clip-image", include_metadata=True)
-
-#     image_ids = {r["metadata"]["imageId"] for r in results_text["matches"] + results_image["matches"]}
-
-#     # Map image IDs to full paths
-#     id_to_path = {}
-#     for image_id in image_ids:
-#         match = shoe_images[shoe_images["image_id"] == image_id]
-#         if not match.empty:
-#             id_to_path[image_id] = match["fullImagePath"].iloc[0]
-
-#     # --- Generate caption from reference image ---
-#     image = Image.open(image_path).convert("RGB")
-#     inputs = caption_processor(images=image, return_tensors="pt")
-#     with torch.no_grad():
-#         caption_output = caption_model.generate(**inputs)
-#     image_caption = caption_processor.decode(caption_output[0], skip_special_tokens=True)
-
-#     # --- Construct BLIP query ---
-#     full_query = f"{user_query}. {image_caption.strip()}"
-
-#     # --- BLIP reranking ---
-#     scored_images = []
-#     for img_id, path in id_to_path.items():
-#         try:
-#             image = Image.open(path).convert("RGB")
-#             inputs = blip_processor(images=image, text=full_query, return_tensors="pt")
-#             with torch.no_grad():
-#                 score = blip_model(**inputs).itm_score
-#             final_score = score.item() if score.ndim == 0 else score[0, 0].item()
-#             scored_images.append((final_score, img_id, path))
-#         except Exception as e:
-#             print(f"Skipping {img_id}: {e}")
-
-#     top_images = sorted(scored_images, key=lambda x: x[0], reverse=True)[:5]
-
-#     # --- Prepare response ---
-#     response_messages = {"images": [
-#         {
-#             "imageId": img_id,
-#             "imagePath": path,
-#             "image": image_to_base64(path),
-#             "score": score
-#         }
-#         for score, img_id, path in top_images
-#     ], "text": f"Found {len(top_images)} results for {text_query}"}
-
-#     return jsonify(response_messages)
 
 @thread_bp.route('/sendMessage', methods=['POST'])
 def send_message():
@@ -222,7 +104,11 @@ def send_message():
         return jsonify({"error": "No valid user message found"}), 400
 
     user_query = latest_user_msg["text"]
-    image_path = latest_user_msg.get("imageId")
+    image_id = latest_user_msg.get("imageId")
+    image_id = str(image_id).strip()
+    print(f"Incoming image_id: {repr(image_id)} (type={type(image_id)})")
+    image_path = get_full_path(image_id)
+    print(f"image_path is {image_path}")
 
     if image_path:
         base64_image = encode_image(image_path)
@@ -234,13 +120,33 @@ def send_message():
         }
 
         gpt_messages = [system_instruction]
-        for msg in full_thread:
-            # TODO: Map image path to image ID, and then pass it as part of the content history
-            # TODO: loop through everything expecpt the last message in full_thread
-            if msg["role"] == "USER":
-                gpt_messages.append({"role": "user", "content": msg["text"]})
-            elif msg["role"] == "ASSISTANT":
-                gpt_messages.append({"role": "assistant", "content": msg["text"]})
+
+        for msg in full_thread[:-1]:
+            role = msg["role"].lower()
+            if role == "assistant":
+                gpt_messages.append({ "role": "assistant", "content": msg["text"] })
+            elif role == "user":
+                image_id = msg.get("imageId")
+                if image_id:
+                    full_path = get_full_path(image_id)
+                    if full_path:
+                        try:
+                            image_b64 = encode_image(full_path)
+                            gpt_messages.append({
+                                "role": "user",
+                                "content": [
+                                    { "type": "text", "text": msg["text"] },
+                                    { "type": "image_url", "image_url": { "url": f"data:image/jpeg;base64,{image_b64}" } }
+                                ]
+                            })
+                        except Exception as e:
+                            print(f"Could not load image {image_id} → {full_path}: {e}")
+                            gpt_messages.append({ "role": "user", "content": msg["text"] })
+                    else:
+                        print(f"Image ID {image_id} not found in shoe_images.")
+                        gpt_messages.append({ "role": "user", "content": msg["text"] })
+                else:
+                    gpt_messages.append({ "role": "user", "content": msg["text"] })
         
         gpt_messages.append({
             "role": "user",
@@ -318,7 +224,7 @@ def send_message():
             except Exception as e:
                 print(f"Skipping {img_id}: {e}")
 
-        top_images = sorted(scored_images, key=lambda x: x[0], reverse=True)[:5]
+        top_images = sorted(scored_images, key=lambda x: x[0], reverse=True)[:10]
     else:
         # --- No reranking needed, just top 20 from Pinecone ---
         top_images = [(1.0, img_id, path) for img_id, path in id_to_path.items()]
