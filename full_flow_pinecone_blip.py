@@ -11,11 +11,6 @@ from transformers import BlipProcessor, BlipForImageTextRetrieval
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
 
-# TODO: Be able to pass 100 best from krish method to blip, and then narrow it down using blip
-# Extra TODO: switch krish method with llama 4 or somethign
-# TODO: Bring in user preferneces and current fashion trends
-# TODO: Make a UI for the app
-
 from transformers import CLIPProcessor, CLIPModel, CLIPTokenizer, CLIPImageProcessor
 from PIL import Image
 import torch
@@ -190,6 +185,12 @@ for image_id, path in unique_image_paths.items():
 
 # --- Sort by BLIP score and select top 20 ---
 blip_scores = sorted(blip_scores, key=lambda x: x[0], reverse=True)[:10]
+
+
+# TODO: Rank resulting blip images by the historic purchases and trending images. 
+# Add images for historic, add images for trends. 
+# Compute similarity between each historic/tranding image and the blip output images
+# keep a score for each blip image - and add the normalised similarity score to the score of each blip image every time you compute the similarity
 
 # --- Display top 20 matching shoes ---
 fig, axes = plt.subplots(1, len(blip_scores), figsize=(4 * len(blip_scores), 5))
