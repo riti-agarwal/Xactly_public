@@ -1,7 +1,7 @@
 # Byte-compiled / optimized / DLL files
-*.pyc
-*.pyo
 __pycache__/
+*.py[co]
+*.pyd
 
 # Environments
 .env
